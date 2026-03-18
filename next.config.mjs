@@ -1,12 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    /* config options here */
-    output: 'standalone',
-    serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
-    transpilePackages: ['marked', 'marked-gfm-heading-id', 'marked-mangle'],
-    experimental: {
-        // Attempting to optimize for Vercel size limit
+    output: 'export',
+    // Set basePath ONLY if your repo is NOT the root GitHub Pages site.
+    // Example: if URL is username.github.io/mdtopdf, uncomment and set:
+    // basePath: '/mdtopdf',
+    // assetPrefix: '/mdtopdf/',
+    images: {
+        unoptimized: true,
     },
+    transpilePackages: [
+        'marked',
+        'marked-gfm-heading-id',
+        'marked-mangle',
+        '@tiptap/core',
+        '@tiptap/react',
+        '@tiptap/starter-kit',
+        '@tiptap/extension-placeholder',
+        '@tiptap/extension-code-block-lowlight',
+        '@tiptap/extension-link',
+        '@tiptap/extension-image',
+        'tiptap-markdown'
+    ],
 };
 
 export default nextConfig;

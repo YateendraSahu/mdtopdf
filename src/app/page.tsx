@@ -1,49 +1,116 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseMarkdown } from '@/lib/markdown';
-import { Download, Eye, Edit3, Loader2, FileText, Moon, Sun } from 'lucide-react';
+import WysiwygEditor from '@/components/WysiwygEditor';
+import { Download, Loader2, FileText, Moon, Sun, Type, Code, Copy, Eye, Trash2, Leaf, FileStack } from 'lucide-react';
+
+
 import { useTheme } from 'next-themes';
 import { Transition } from '@headlessui/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import mermaid from 'mermaid';
+
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const DEFAULT_MARKDOWN = `# Hello Markdown to PDF!
+const DEFAULT_MARKDOWN = `# Advanced Markdown Support
 
-This is a **production-ready** generator built with Next.js 15.
+This editor now supports **Tables**, **Equations**, and **Mermaid Diagrams**!
 
-## Features
-- [x] Zero client-side PDF dependencies
-- [x] Server-side rendering with Puppeteer
-- [x] GitHub Flavored Markdown
-- [x] Dark mode support
-- [x] Beautiful typography
+## 1. Tables
+| Feature | Support | Performance |
+| :--- | :---: | ---: |
+| Markdown | Fully | High |
+| Rich Text | Fully | Smooth |
+| PDF Export | Puppeteer | Fast |
 
-### Code Example
-\`\`\`javascript
-const greeting = "Hello World";
-console.log(greeting);
+## 2. Equations (KaTeX)
+The Cauchy-Schwarz Inequality:
+
+\`\`\`math
+\\left( \\sum_{k=1}^n a_k b_k \\right)^2 \\leq \\left( \\sum_{k=1}^n a_k^2 \\right) \\left( \\sum_{k=1}^n b_k^2 \\right)
 \`\`\`
 
-> "Simplicity is the soul of efficiency." — Austin Freeman
+## 3. Flow Blocks (Mermaid)
+\`\`\`mermaid
+graph TD;
+    Markdown -->|Parse| HTML;
+    HTML -->|Render| PDF;
+    PDF -->|Download| User;
+\`\`\`
 
-![Sample Image](https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=400&q=80)
+### Features
+- [x] Zero client-side PDF dependencies
+- [x] Beautiful KaTeX Math Rendering
+- [x] Mermaid Flowcharts & Diagrams
 `;
+
+
 
 export default function MarkdownEditor() {
   const [markdown, setMarkdown] = useState(DEFAULT_MARKDOWN);
   const [html, setHtml] = useState('');
-  const [isPreview, setIsPreview] = useState(false);
+  const [viewMode, setViewMode] = useState<'visual' | 'markdown' | 'split'>('split');
   const [isGenerating, setIsGenerating] = useState(false);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  const markdownRef = useRef<HTMLTextAreaElement>(null);
+  const visualScrollRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize scroll on click/select (Markdown -> Visual)
+  const syncScroll = useCallback(() => {
+    if (!markdownRef.current || !visualScrollRef.current || viewMode !== 'split') return;
+
+    const textarea = markdownRef.current;
+    const visual = visualScrollRef.current;
+
+    // Calculate percentage of cursor position
+    const cursorPosition = textarea.selectionStart;
+    const totalLength = textarea.value.length || 1;
+    const percentage = cursorPosition / totalLength;
+
+    const targetScroll = (visual.scrollHeight - visual.clientHeight) * percentage;
+
+    // Only scroll preview if user is NOT scrolling the preview themselves
+    // and if the difference is significant
+    if (Math.abs(visual.scrollTop - targetScroll) > 100) {
+      visual.scrollTo({
+        top: targetScroll,
+        behavior: 'smooth'
+      });
+    }
+  }, [viewMode]);
+
+  // Synchronize scroll (Visual -> Markdown)
+  const syncVisualToMarkdown = useCallback((percentage: number) => {
+    // CRITICAL FIX: Don't scroll the markdown editor if the user is currently typing in it!
+    if (!markdownRef.current || viewMode !== 'split' || document.activeElement === markdownRef.current) return;
+
+    const textarea = markdownRef.current;
+    const targetScroll = (textarea.scrollHeight - textarea.clientHeight) * percentage;
+
+    if (Math.abs(textarea.scrollTop - targetScroll) > 50) {
+      textarea.scrollTo({
+        top: targetScroll,
+        behavior: 'smooth'
+      });
+    }
+  }, [viewMode]);
+
   useEffect(() => {
     setMounted(true);
+    // On mobile, default to Visual (Preview) mode instead of Split
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('visual');
+    }
+  }, []);
+
+  useEffect(() => {
     const updatePreview = async () => {
       const parsed = await parseMarkdown(markdown);
       setHtml(parsed);
@@ -65,8 +132,7 @@ export default function MarkdownEditor() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate PDF');
+        throw new Error('API Unavailable (Expected on GitHub Pages)');
       }
 
       const blob = await response.blob();
@@ -79,20 +145,23 @@ export default function MarkdownEditor() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error: any) {
-      alert(error.message);
+      console.warn('Server-side PDF failed, falling back to browser print:', error.message);
+      // FALLBACK for GitHub Pages: Use window.print()
+      window.print();
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 print:hidden">
       {/* Header */}
       <header className="sticky top-0 z-30 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-blue-600 p-2 rounded-lg">
-              <FileText className="w-5 h-5 text-white" />
+              <FileStack className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-xl font-bold tracking-tight hidden sm:block">MD<span className="text-blue-600">to</span>PDF</h1>
           </div>
@@ -107,30 +176,22 @@ export default function MarkdownEditor() {
             </button>
 
             <button
-              onClick={() => setIsPreview(!isPreview)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-            >
-              {isPreview ? <Edit3 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              {isPreview ? 'Edit' : 'Preview'}
-            </button>
-
-            <button
               onClick={handleGeneratePDF}
               disabled={isGenerating}
               className={cn(
-                "flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20",
+                "flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 text-sm font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20",
                 isGenerating && "px-8"
               )}
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
+                  <span className="hidden sm:inline">Generating...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  Generate PDF
+                  <span className="hidden sm:inline">Generate PDF</span>
                 </>
               )}
             </button>
@@ -138,43 +199,113 @@ export default function MarkdownEditor() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 h-[calc(100vh-4rem)]">
-        <div className="grid grid-cols-1 gap-6 h-full">
-          <div className="relative h-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 dark:shadow-none">
-            {/* Editor */}
-            <div className={cn(
-              "absolute inset-0 transition-all duration-300 p-6 flex flex-col",
-              isPreview ? "opacity-0 pointer-events-none translate-x-4" : "opacity-100 translate-x-0"
-            )}>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Markdown Editor</span>
-                <span className="text-xs text-slate-400">{markdown.length} characters</span>
+      <main className="w-full h-[calc(100vh-4rem)] p-4 md:p-6 overflow-hidden">
+        <div className="h-full">
+          {/* Editor Container */}
+          <div className="flex flex-col h-full overflow-hidden rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl shadow-blue-500/5 dark:shadow-none p-4 md:p-8 transition-all duration-500">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-400">Editor</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(markdown);
+                      }}
+                      className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                      title="Copy Markdown"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to clear all content?')) {
+                          setMarkdown('');
+                        }
+                      }}
+                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                      title="Clear All Content"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 w-full sm:w-auto">
+                  <button
+                    onClick={() => setViewMode('visual')}
+                    className={cn(
+                      "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] md:text-xs font-semibold rounded-md transition-all",
+                      viewMode === 'visual'
+                        ? "bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400"
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Type className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Visual</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('markdown')}
+                    className={cn(
+                      "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] md:text-xs font-semibold rounded-md transition-all",
+                      viewMode === 'markdown'
+                        ? "bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400"
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Code className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Markdown</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('split')}
+                    className={cn(
+                      "hidden md:flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] md:text-xs font-semibold rounded-md transition-all",
+                      viewMode === 'split'
+                        ? "bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400"
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Split View</span>
+                  </button>
+                </div>
               </div>
-              <textarea
-                value={markdown}
-                onChange={(e) => setMarkdown(e.target.value)}
-                placeholder="Type your markdown here..."
-                className="flex-1 w-full bg-transparent resize-none focus:outline-none font-mono text-sm leading-relaxed"
-              />
+              <span className="text-[10px] text-slate-400 hidden sm:block">{markdown.length} characters</span>
             </div>
 
-            {/* Preview */}
-            <div className={cn(
-              "absolute inset-0 transition-all duration-300 p-6 overflow-y-auto custom-scrollbar",
-              isPreview ? "opacity-100 translate-x-0" : "opacity-0 pointer-events-none -translate-x-4"
-            )}>
-              <div className="flex items-center justify-between mb-8 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Live Preview</span>
-              </div>
-              <div
-                className="prose prose-slate dark:prose-invert max-w-none prose-pre:bg-slate-900 prose-pre:dark:bg-slate-800 prose-img:rounded-xl"
-                dangerouslySetInnerHTML={{ __html: html }}
-              />
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4">
+              {(viewMode === 'visual' || viewMode === 'split') && (
+                <div className={cn("flex-1 min-w-0 transition-all", viewMode === 'split' ? "md:w-1/2" : "w-full")}>
+                  <WysiwygEditor value={markdown} onChange={setMarkdown} scrollRef={visualScrollRef} onSelectionChange={syncVisualToMarkdown} />
+                </div>
+              )}
+              {(viewMode === 'markdown' || viewMode === 'split') && (
+                <div className={cn("flex-1 min-w-0 transition-all", viewMode === 'split' ? "md:w-1/2" : "w-full focus-within:ring-2 ring-blue-500 rounded-xl")}>
+                  <textarea
+                    ref={markdownRef}
+                    value={markdown}
+                    onChange={(e) => setMarkdown(e.target.value)}
+                    onSelect={syncScroll}
+                    onClick={syncScroll}
+                    onKeyUp={syncScroll}
+                    placeholder="Type your markdown here..."
+                    className="w-full h-full bg-white-50/50 dark:bg-slate-950/30 backdrop-blur-sm resize-none focus:outline-none font-mono text-xs md:text-sm leading-relaxed p-4 md:p-6 border border-slate-200 dark:border-slate-800 rounded-xl transition-all"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
       </main>
 
-    </div>
+
+
+
+      </div>
+      
+      {/* Hidden Container for Browser Print (GitHub Pages Fallback) */}
+      <div className="hidden print:block print:p-12 print:bg-white print:text-slate-900">
+         <article className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    </>
   );
 }

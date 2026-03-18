@@ -21,3 +21,93 @@
 body {
   color: rgb(var(--foreground-rgb));
 }
+
+/* Tighten Prose Spacing */
+.prose {
+  line-height: 1.4 !important;
+}
+
+.prose p {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+  color: #1e40af !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+}
+
+.prose ul, .prose ol {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.prose li {
+  margin-top: 0.125rem !important;
+  margin-bottom: 0.125rem !important;
+}
+
+.prose pre {
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  line-height: 1.5 !important;
+  border-radius: 0.5rem !important;
+}
+
+.prose code {
+  background-color: transparent !important;
+  color: inherit !important;
+  font-weight: 500 !important;
+}
+
+.prose code::before,
+.prose code::after {
+  content: "" !important;
+}
+
+.prose blockquote {
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Tables */
+.prose table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.prose th, .prose td {
+  border: 1px solid #e2e8f0 !important;
+  padding: 0.75rem !important;
+  text-align: left !important;
+}
+
+.prose th {
+  background-color: #f8fafc !important;
+  font-weight: 700 !important;
+  color: #1e40af !important;
+}
+
+.dark .prose th, .dark .prose td {
+  border-color: #334155 !important;
+}
+
+.dark .prose th {
+  background-color: #1e293b !important;
+  color: #60a5fa !important;
+}
+
+/* KaTeX */
+.katex-display {
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
