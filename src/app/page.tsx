@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseMarkdown } from '@/lib/markdown';
 import WysiwygEditor from '@/components/WysiwygEditor';
 import { Download, Loader2, FileText, Moon, Sun, Type, Code, Copy, Eye, Trash2, Leaf, FileStack } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 import { useTheme } from 'next-themes';
@@ -150,11 +152,6 @@ export default function MarkdownEditor() {
       // Fallback: Custom client-side PDF using jsPDF + html2canvas (Rock solid on GitHub Pages)
       console.warn('Server-side PDF unavailable, using jsPDF + html2canvas fallback.');
       try {
-        const [jsPDF, html2canvas] = await Promise.all([
-          import('jspdf').then(m => m.default),
-          import('html2canvas').then(m => m.default)
-        ]);
-        
         const element = document.getElementById('print-content');
         if (!element) throw new Error('Print container not found ($print-content)');
         
@@ -187,18 +184,17 @@ export default function MarkdownEditor() {
         }
 
         // Final rendering delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         // Start High-Res Capture
         const canvas = await html2canvas(element, {
-          scale: 2, // 2x for high print quality
+          scale: 2, 
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          width: 800, // Fixed width for A4 consistency
+          width: 800,
           windowWidth: 800,
           onclone: (doc) => {
-             // Force visibility in the clone used for capture
              const el = doc.getElementById('print-content');
              if (el) {
                el.style.position = 'static';
@@ -209,7 +205,7 @@ export default function MarkdownEditor() {
           }
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const pdf = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
@@ -220,13 +216,14 @@ export default function MarkdownEditor() {
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-        // Add to PDF
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         pdf.save('document.pdf');
 
       } catch (fallbackErr: any) {
         console.error('Final PDF Fallback Failed:', fallbackErr);
-        if (confirm('Direct download failed due to browser restrictions. Would you like to use the system Print dialog instead?')) {
+        // Display specific error to user for debugging
+        const errorMsg = fallbackErr.message || String(fallbackErr);
+        if (confirm(`Direct download failed: ${errorMsg}\n\nWould you like to use the system Print dialog instead?`)) {
           window.print();
         }
       }
