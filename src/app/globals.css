@@ -111,3 +111,59 @@ body {
   overflow-x: auto !important;
   overflow-y: hidden !important;
 }
+
+/* Professional Print Styles */
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm 15mm;
+  }
+
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 255, 255, 255;
+    --background-end-rgb: 255, 255, 255;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .prose {
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+    color: black !important;
+    max-width: none !important;
+  }
+
+  .prose h1, .prose h2, .prose h3 {
+    color: black !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .prose pre, .prose blockquote, .prose table {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Force white background for code blocks in print */
+  .prose pre {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .prose th {
+    background-color: #f1f5f9 !important;
+    color: black !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .prose td {
+    border-color: #e2e8f0 !important;
+  }
+}

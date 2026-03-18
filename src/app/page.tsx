@@ -4,9 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseMarkdown } from '@/lib/markdown';
 import WysiwygEditor from '@/components/WysiwygEditor';
 import { Download, Loader2, FileText, Moon, Sun, Type, Code, Copy, Eye, Trash2, Leaf, FileStack } from 'lucide-react';
-import jsPDF from 'jspdf';
-import { toJpeg } from 'html-to-image';
-
 
 import { useTheme } from 'next-themes';
 import { Transition } from '@headlessui/react';
@@ -148,79 +145,8 @@ export default function MarkdownEditor() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error: any) {
-      // Fallback: client-side PDF using html2pdf.js (works on GitHub Pages)
-      // Fallback: Custom client-side PDF using jsPDF + html2canvas (Rock solid on GitHub Pages)
-      console.warn('Server-side PDF unavailable, using jsPDF + html2canvas fallback.');
-      try {
-        const element = document.getElementById('print-content');
-        if (!element) throw new Error('Print container not found ($print-content)');
-        
-        // Ensure diagrams are rendered in the print-content div
-        try {
-          mermaid.initialize({
-            startOnLoad: false,
-            theme: theme === 'dark' ? 'dark' : 'default',
-            securityLevel: 'loose',
-          });
-          
-          const mermaidBlocks = element.querySelectorAll('pre code.language-mermaid');
-          for (let i = 0; i < mermaidBlocks.length; i++) {
-            try {
-              const block = mermaidBlocks[i] as HTMLElement;
-              const content = block.textContent || '';
-              const id = `mermaid-pdf-final-${i}`;
-              const { svg } = await mermaid.render(id, content);
-              const parent = block.parentElement;
-              if (parent) {
-                parent.innerHTML = svg;
-                parent.className = "flex justify-center p-8 bg-slate-50/50 rounded-xl my-6";
-              }
-            } catch (blockErr) {
-              console.warn('Skipping diagram block:', blockErr);
-            }
-          }
-        } catch (mermaidErr) {
-          console.warn('Mermaid engine skip:', mermaidErr);
-        }
-
-        // Final rendering delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        // Start Modern High-Res Capture (Fixes 'lab' color errors)
-        const imgData = await toJpeg(element, {
-          quality: 0.95,
-          backgroundColor: '#ffffff',
-          width: 800,
-          style: {
-            position: 'static',
-            left: '0',
-            opacity: '1',
-            visibility: 'visible',
-            fontFamily: 'system-ui, -apple-system, sans-serif'
-          }
-        });
-
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save('document.pdf');
-
-      } catch (fallbackErr: any) {
-        console.error('Final PDF Fallback Failed:', fallbackErr);
-        // Display specific error to user for debugging
-        const errorMsg = fallbackErr.message || String(fallbackErr);
-        if (confirm(`Direct download failed: ${errorMsg}\n\nWould you like to use the system Print dialog instead?`)) {
-          window.print();
-        }
-      }
+      console.warn('Server-side PDF unavailable, using native print fallback.');
+      window.print();
     } finally {
       setIsGenerating(false);
     }
@@ -375,15 +301,11 @@ export default function MarkdownEditor() {
 
       </div>
       
-      {/* Hidden Print Container — rendered off-screen for html2pdf.js (GitHub Pages Fallback) */}
-      <div
-        id="print-content"
-        className="fixed -left-[9999px] top-0 w-[210mm] pointer-events-none bg-white text-slate-900"
-        style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
-      >
-         <div className="prose prose-slate max-w-none p-12 bg-white text-slate-900 shadow-none">
-            <div dangerouslySetInnerHTML={{ __html: html }} />
-         </div>
+      {/* Print-only container — This is what shows up in the PDF (searchable text) */}
+      <div className="hidden print:block print:bg-white print:text-black min-h-screen">
+        <div className="mx-auto max-w-[210mm] p-12 bg-white">
+          <article className="prose prose-slate max-w-none prose-headings:text-black prose-p:text-gray-800" dangerouslySetInnerHTML={{ __html: html }} />
+        </div>
       </div>
     </>
   );
