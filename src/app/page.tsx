@@ -149,51 +149,69 @@ export default function MarkdownEditor() {
       // Fallback: client-side PDF using html2pdf.js (works on GitHub Pages)
       console.warn('Server-side PDF unavailable, using html2pdf.js fallback.');
       try {
-        const html2pdf = (await import('html2pdf.js')).default;
+        const html2pdfModule = await import('html2pdf.js');
+        // Handle different export patterns (ESM vs CJS)
+        const html2pdf = (html2pdfModule as any).default || html2pdfModule;
+        
         const element = document.getElementById('print-content');
-        if (!element) throw new Error('Print content not found');
+        if (!element) throw new Error('Print content container not found in DOM');
         
-        // Small delay to ensure any layout calculations or re-renders are complete
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Ensure Mermaid diagrams are rendered in the print-content div
+        // Ensure diagrams are rendered in the print-content div
         try {
-          // Initialize mermaid with specific settings for the high-quality PDF render
+          // Initialize mermaid with specific settings for the PDF render
           mermaid.initialize({
             startOnLoad: false,
             theme: theme === 'dark' ? 'dark' : 'default',
             securityLevel: 'loose',
-            fontFamily: 'Inter, system-ui, sans-serif'
           });
           
           const mermaidBlocks = element.querySelectorAll('pre code.language-mermaid');
           for (let i = 0; i < mermaidBlocks.length; i++) {
-            const block = mermaidBlocks[i] as HTMLElement;
-            const content = block.textContent || '';
-            const id = `mermaid-pdf-${i}`;
-            const { svg } = await mermaid.render(id, content);
-            const parent = block.parentElement;
-            if (parent) {
-              parent.innerHTML = svg;
-              parent.className = "flex justify-center p-8 bg-slate-50 rounded-2xl my-6";
+            try {
+              const block = mermaidBlocks[i] as HTMLElement;
+              const content = block.textContent || '';
+              const id = `mermaid-pdf-${i}`;
+              // Render diagram to SVG
+              const renderResult = await mermaid.render(id, content);
+              const svg = typeof renderResult === 'string' ? renderResult : renderResult.svg;
+              
+              const parent = block.parentElement;
+              if (parent) {
+                parent.innerHTML = svg;
+                parent.className = "flex justify-center p-8 bg-slate-50/50 rounded-xl my-6";
+              }
+            } catch (blockErr) {
+              console.warn('Skipping problematic mermaid block:', blockErr);
             }
           }
         } catch (mermaidErr) {
-          console.error('Mermaid render for PDF failed:', mermaidErr);
+          console.warn('Mermaid pass failed, proceeding without diagrams:', mermaidErr);
         }
 
-        await html2pdf()
-          .set({
-            margin: [10, 10, 10, 10],
-            filename: 'document.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          } as any)
-          .from(element)
-          .save();
-      } catch (fallbackErr) {
-        alert('Could not generate PDF. Please try using your browser\'s Print function (Ctrl+P).');
+        // Wait for all rendering (including KaTeX) to settle
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const opt = {
+          margin: 10,
+          filename: 'document.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Trigger the download
+        await html2pdf().from(element).set(opt).save();
+      } catch (fallbackErr: any) {
+        console.error('HTML2PDF Fallback Error:', fallbackErr);
+        // If html2pdf fails, last resort is browser print
+        if (confirm('Direct download failed. Would you like to use your browser\'s Print function instead?')) {
+          window.print();
+        }
       }
     } finally {
       setIsGenerating(false);
