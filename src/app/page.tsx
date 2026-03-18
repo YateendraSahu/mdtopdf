@@ -125,6 +125,7 @@ export default function MarkdownEditor() {
     setIsGenerating(true);
 
     try {
+      // First try the server-side Puppeteer pipeline (Vercel / local)
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,7 +133,7 @@ export default function MarkdownEditor() {
       });
 
       if (!response.ok) {
-        throw new Error('API Unavailable (Expected on GitHub Pages)');
+        throw new Error('API Unavailable');
       }
 
       const blob = await response.blob();
@@ -145,9 +146,26 @@ export default function MarkdownEditor() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error: any) {
-      console.warn('Server-side PDF failed, falling back to browser print:', error.message);
-      // FALLBACK for GitHub Pages: Use window.print()
-      window.print();
+      // Fallback: client-side PDF using html2pdf.js (works on GitHub Pages)
+      console.warn('Server-side PDF unavailable, using html2pdf.js fallback.');
+      try {
+        const html2pdf = (await import('html2pdf.js')).default;
+        const element = document.getElementById('print-content');
+        if (!element) throw new Error('Print content not found');
+        
+        await html2pdf()
+          .set({
+            margin: [10, 10, 10, 10],
+            filename: 'document.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          } as any)
+          .from(element)
+          .save();
+      } catch (fallbackErr) {
+        alert('Could not generate PDF. Please try using your browser\'s Print function (Ctrl+P).');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -302,10 +320,13 @@ export default function MarkdownEditor() {
 
       </div>
       
-      {/* Hidden Container for Browser Print (GitHub Pages Fallback) */}
-      <div className="hidden print:block print:p-12 print:bg-white print:text-slate-900">
-         <article className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
-      </div>
+      {/* Hidden Print Container — rendered by html2pdf.js on GitHub Pages */}
+      <div
+        id="print-content"
+        className="hidden print:block"
+        style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: '#334155', lineHeight: 1.5 }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </>
   );
 }
