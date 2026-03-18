@@ -153,12 +153,41 @@ export default function MarkdownEditor() {
         const element = document.getElementById('print-content');
         if (!element) throw new Error('Print content not found');
         
+        // Small delay to ensure any layout calculations or re-renders are complete
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Ensure Mermaid diagrams are rendered in the print-content div
+        try {
+          // Initialize mermaid with specific settings for the high-quality PDF render
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: theme === 'dark' ? 'dark' : 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Inter, system-ui, sans-serif'
+          });
+          
+          const mermaidBlocks = element.querySelectorAll('pre code.language-mermaid');
+          for (let i = 0; i < mermaidBlocks.length; i++) {
+            const block = mermaidBlocks[i] as HTMLElement;
+            const content = block.textContent || '';
+            const id = `mermaid-pdf-${i}`;
+            const { svg } = await mermaid.render(id, content);
+            const parent = block.parentElement;
+            if (parent) {
+              parent.innerHTML = svg;
+              parent.className = "flex justify-center p-8 bg-slate-50 rounded-2xl my-6";
+            }
+          }
+        } catch (mermaidErr) {
+          console.error('Mermaid render for PDF failed:', mermaidErr);
+        }
+
         await html2pdf()
           .set({
             margin: [10, 10, 10, 10],
             filename: 'document.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           } as any)
           .from(element)
@@ -320,13 +349,16 @@ export default function MarkdownEditor() {
 
       </div>
       
-      {/* Hidden Print Container — rendered by html2pdf.js on GitHub Pages */}
+      {/* Hidden Print Container — rendered off-screen for html2pdf.js (GitHub Pages Fallback) */}
       <div
         id="print-content"
-        className="hidden print:block"
-        style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: '#334155', lineHeight: 1.5 }}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+        className="fixed -left-[9999px] top-0 w-[210mm] pointer-events-none bg-white text-slate-900"
+        style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+      >
+         <div className="prose prose-slate max-w-none p-12 bg-white text-slate-900 shadow-none">
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+         </div>
+      </div>
     </>
   );
 }
