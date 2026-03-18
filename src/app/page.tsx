@@ -147,18 +147,19 @@ export default function MarkdownEditor() {
       document.body.removeChild(a);
     } catch (error: any) {
       // Fallback: client-side PDF using html2pdf.js (works on GitHub Pages)
-      console.warn('Server-side PDF unavailable, using html2pdf.js fallback.');
+      // Fallback: Custom client-side PDF using jsPDF + html2canvas (Rock solid on GitHub Pages)
+      console.warn('Server-side PDF unavailable, using jsPDF + html2canvas fallback.');
       try {
-        const html2pdfModule = await import('html2pdf.js');
-        // Handle different export patterns (ESM vs CJS)
-        const html2pdf = (html2pdfModule as any).default || html2pdfModule;
+        const [jsPDF, html2canvas] = await Promise.all([
+          import('jspdf').then(m => m.default),
+          import('html2canvas').then(m => m.default)
+        ]);
         
         const element = document.getElementById('print-content');
-        if (!element) throw new Error('Print content container not found in DOM');
+        if (!element) throw new Error('Print container not found ($print-content)');
         
         // Ensure diagrams are rendered in the print-content div
         try {
-          // Initialize mermaid with specific settings for the PDF render
           mermaid.initialize({
             startOnLoad: false,
             theme: theme === 'dark' ? 'dark' : 'default',
@@ -170,46 +171,62 @@ export default function MarkdownEditor() {
             try {
               const block = mermaidBlocks[i] as HTMLElement;
               const content = block.textContent || '';
-              const id = `mermaid-pdf-${i}`;
-              // Render diagram to SVG
-              const renderResult = await mermaid.render(id, content);
-              const svg = typeof renderResult === 'string' ? renderResult : renderResult.svg;
-              
+              const id = `mermaid-pdf-final-${i}`;
+              const { svg } = await mermaid.render(id, content);
               const parent = block.parentElement;
               if (parent) {
                 parent.innerHTML = svg;
                 parent.className = "flex justify-center p-8 bg-slate-50/50 rounded-xl my-6";
               }
             } catch (blockErr) {
-              console.warn('Skipping problematic mermaid block:', blockErr);
+              console.warn('Skipping diagram block:', blockErr);
             }
           }
         } catch (mermaidErr) {
-          console.warn('Mermaid pass failed, proceeding without diagrams:', mermaidErr);
+          console.warn('Mermaid engine skip:', mermaidErr);
         }
 
-        // Wait for all rendering (including KaTeX) to settle
+        // Final rendering delay
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const opt = {
-          margin: 10,
-          filename: 'document.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff'
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        // Start High-Res Capture
+        const canvas = await html2canvas(element, {
+          scale: 2, // 2x for high print quality
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: 800, // Fixed width for A4 consistency
+          windowWidth: 800,
+          onclone: (doc) => {
+             // Force visibility in the clone used for capture
+             const el = doc.getElementById('print-content');
+             if (el) {
+               el.style.position = 'static';
+               el.style.left = '0';
+               el.style.opacity = '1';
+               el.style.visibility = 'visible';
+             }
+          }
+        });
 
-        // Trigger the download
-        await html2pdf().from(element).set(opt).save();
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        // Add to PDF
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save('document.pdf');
+
       } catch (fallbackErr: any) {
-        console.error('HTML2PDF Fallback Error:', fallbackErr);
-        // If html2pdf fails, last resort is browser print
-        if (confirm('Direct download failed. Would you like to use your browser\'s Print function instead?')) {
+        console.error('Final PDF Fallback Failed:', fallbackErr);
+        if (confirm('Direct download failed due to browser restrictions. Would you like to use the system Print dialog instead?')) {
           window.print();
         }
       }
