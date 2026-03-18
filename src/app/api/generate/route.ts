@@ -260,24 +260,31 @@ export async function POST(req: NextRequest) {
 
     try {
       browser = await puppeteer.launch({
-        args: isLocal ? ['--no-sandbox'] : chromium.args,
+        args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : [
+            ...chromium.args,
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // Often needed for Lambda environments like Netlify
+          ],
         executablePath: executablePath,
-        headless: isLocal ? true : chromium.headless,
-        defaultViewport: chromium.defaultViewport,
+        headless: isLocal ? true : (chromium as any).headless || true,
+        defaultViewport: (chromium as any).defaultViewport || { width: 1200, height: 800 },
       });
     } catch (e: any) {
-       console.error('Initial launch failed, trying alternate paths...');
-       // If the first path failed, try Chrome as a secondary
-       if (isLocal) {
-          try {
-            browser = await puppeteer.launch({
-              args: ['--no-sandbox'],
-              executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-              headless: true,
-            });
-          } catch (e2: any) {
-             throw new Error(`Failed to launch browser locally. Please ensure Edge or Chrome is installed. Error: ${e.message}`);
-          }
+       console.error('Browser Launch Error:', e.message);
+       // Attempt to re-launch once with minimal args if it failed
+       if (!isLocal) {
+         try {
+           browser = await puppeteer.launch({
+             args: [...chromium.args, '--no-sandbox'],
+             executablePath: executablePath,
+             headless: true,
+           });
+         } catch (e2: any) {
+           throw new Error(`Puppeteer failed on Server: ${e.message}`);
+         }
        } else {
           throw e;
        }
@@ -316,7 +323,7 @@ export async function POST(req: NextRequest) {
 
 
 
-    return new Response(pdfBuffer as any, {
+    return new NextResponse(Buffer.from(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
