@@ -5,6 +5,7 @@ import { parseMarkdown } from '@/lib/markdown';
 import WysiwygEditor from '@/components/WysiwygEditor';
 import { Download, Loader2, FileText, Moon, Sun, Type, Code, Copy, Eye, Trash2, Leaf, FileStack } from 'lucide-react';
 
+
 import { useTheme } from 'next-themes';
 import { Transition } from '@headlessui/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -124,7 +125,6 @@ export default function MarkdownEditor() {
     setIsGenerating(true);
 
     try {
-      // First try the server-side Puppeteer pipeline (Vercel / local)
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,7 +132,8 @@ export default function MarkdownEditor() {
       });
 
       if (!response.ok) {
-        throw new Error('API Unavailable');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate PDF');
       }
 
       const blob = await response.blob();
@@ -145,16 +146,14 @@ export default function MarkdownEditor() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error: any) {
-      console.warn('Server-side PDF unavailable, using native print fallback.');
-      window.print();
+      alert(error.message);
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 print:hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       {/* Header */}
       <header className="sticky top-0 z-30 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -299,14 +298,6 @@ export default function MarkdownEditor() {
 
 
 
-      </div>
-      
-      {/* Print-only container — This is what shows up in the PDF (searchable text) */}
-      <div className="hidden print:block print:bg-white print:text-black min-h-screen">
-        <div className="mx-auto max-w-[210mm] p-12 bg-white">
-          <article className="prose prose-slate max-w-none prose-headings:text-black prose-p:text-gray-800" dangerouslySetInnerHTML={{ __html: html }} />
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
