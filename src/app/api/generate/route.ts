@@ -5,6 +5,10 @@ import { parseMarkdown } from '@/lib/markdown';
 // For production, use Upstash or similar
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
 
+export const maxDuration = 60; // Increase timeout for PDF generation
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 function isRateLimited(ip: string) {
   const now = Date.now();
   const limit = 5;
@@ -27,9 +31,9 @@ export async function POST(req: NextRequest) {
   let browser: any = null;
   try {
     // Dynamically import Puppeteer and Chromium only when needed
-    // This prevents startup crashes in non-compatible environments
+    // This reduces the cold-start package size and avoids local conflicts
     const puppeteer = (await import('puppeteer-core')).default;
-    const chromium = (await import('@sparticuz/chromium')).default;
+    const chromium = await import('@sparticuz/chromium');
 
     const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
     if (isRateLimited(ip)) {
@@ -239,7 +243,7 @@ export async function POST(req: NextRequest) {
 
     let executablePath: string;
     if (isLocal) {
-      // Try multiple common local browser paths
+      // Try multiple common local browser paths for Windows
       const paths = [
         'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
         'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -248,17 +252,18 @@ export async function POST(req: NextRequest) {
       ];
       
       executablePath = paths[0]; 
-      console.log('Attempting to launch browser at:', executablePath);
+      console.log('Local Mode: Using browser at:', executablePath);
     } else {
-      // Use the helper for production (Vercel)
-      executablePath = await (chromium as any).executablePath();
+      // Production Mode: Vercel/Linux
+      executablePath = await chromium.executablePath();
     }
 
     try {
-      browser = await (puppeteer as any).launch({
-        args: isLocal ? ['--no-sandbox'] : (chromium as any).args,
+      browser = await puppeteer.launch({
+        args: isLocal ? ['--no-sandbox'] : chromium.args,
         executablePath: executablePath,
-        headless: true,
+        headless: isLocal ? true : chromium.headless,
+        defaultViewport: chromium.defaultViewport,
       });
     } catch (e: any) {
        console.error('Initial launch failed, trying alternate paths...');
@@ -279,10 +284,13 @@ export async function POST(req: NextRequest) {
     }
 
     const page = await browser.newPage();
-    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+    // Use 'load' instead of 'networkidle0' to save time, 
+    // we'll handle mermaid specifically
+    await page.setContent(fullHtml, { waitUntil: 'load' });
 
-    // Give mermaid diagrams more time to render fully
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Give mermaid diagrams and KaTeX time to finish rendering
+    // Optimized for Vercel's 10s (Hobby) timeout limit
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const pdfBuffer = await page.pdf({
       format: 'A4',
