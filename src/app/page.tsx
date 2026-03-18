@@ -5,7 +5,7 @@ import { parseMarkdown } from '@/lib/markdown';
 import WysiwygEditor from '@/components/WysiwygEditor';
 import { Download, Loader2, FileText, Moon, Sun, Type, Code, Copy, Eye, Trash2, Leaf, FileStack } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toJpeg } from 'html-to-image';
 
 
 import { useTheme } from 'next-themes';
@@ -186,26 +186,20 @@ export default function MarkdownEditor() {
         // Final rendering delay
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        // Start High-Res Capture
-        const canvas = await html2canvas(element, {
-          scale: 2, 
-          useCORS: true,
-          logging: false,
+        // Start Modern High-Res Capture (Fixes 'lab' color errors)
+        const imgData = await toJpeg(element, {
+          quality: 0.95,
           backgroundColor: '#ffffff',
           width: 800,
-          windowWidth: 800,
-          onclone: (doc) => {
-             const el = doc.getElementById('print-content');
-             if (el) {
-               el.style.position = 'static';
-               el.style.left = '0';
-               el.style.opacity = '1';
-               el.style.visibility = 'visible';
-             }
+          style: {
+            position: 'static',
+            left: '0',
+            opacity: '1',
+            visibility: 'visible',
+            fontFamily: 'system-ui, -apple-system, sans-serif'
           }
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const pdf = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
