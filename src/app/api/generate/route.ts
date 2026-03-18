@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import { parseMarkdown } from '@/lib/markdown';
 
 // Optional: Rate limiting simple implementation
@@ -28,6 +26,11 @@ function isRateLimited(ip: string) {
 export async function POST(req: NextRequest) {
   let browser: any = null;
   try {
+    // Dynamically import Puppeteer and Chromium only when needed
+    // This prevents startup crashes in non-compatible environments
+    const puppeteer = (await import('puppeteer-core')).default;
+    const chromium = (await import('@sparticuz/chromium')).default;
+
     const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
     if (isRateLimited(ip)) {
       return NextResponse.json({ error: 'Rate limit exceeded. Max 5 requests per minute.' }, { status: 429 });
@@ -232,22 +235,48 @@ export async function POST(req: NextRequest) {
       </html>
     `;
 
-    // Determine if we are running locally (Windows) or in production (Vercel/Linux)
     const isLocal = process.env.NODE_ENV === 'development' || process.platform === 'win32';
 
     let executablePath: string;
     if (isLocal) {
-      // Local Windows paths (Edge is usually available)
-      executablePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+      // Try multiple common local browser paths
+      const paths = [
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      ];
+      
+      executablePath = paths[0]; 
+      console.log('Attempting to launch browser at:', executablePath);
     } else {
-      executablePath = await chromium.executablePath();
+      // Use the helper for production (Vercel)
+      executablePath = await (chromium as any).executablePath();
     }
 
-      browser = await puppeteer.launch({
-        args: isLocal ? [] : chromium.args,
+    try {
+      browser = await (puppeteer as any).launch({
+        args: isLocal ? ['--no-sandbox'] : (chromium as any).args,
         executablePath: executablePath,
         headless: true,
       });
+    } catch (e: any) {
+       console.error('Initial launch failed, trying alternate paths...');
+       // If the first path failed, try Chrome as a secondary
+       if (isLocal) {
+          try {
+            browser = await puppeteer.launch({
+              args: ['--no-sandbox'],
+              executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+              headless: true,
+            });
+          } catch (e2: any) {
+             throw new Error(`Failed to launch browser locally. Please ensure Edge or Chrome is installed. Error: ${e.message}`);
+          }
+       } else {
+          throw e;
+       }
+    }
 
     const page = await browser.newPage();
     await page.setContent(fullHtml, { waitUntil: 'networkidle0' });

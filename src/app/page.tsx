@@ -132,8 +132,17 @@ export default function MarkdownEditor() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate PDF');
+        let errorMessage = 'Failed to generate PDF';
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } else {
+          const text = await response.text();
+          errorMessage = `Server Error: ${response.status} ${response.statusText}. Response starts with: ${text.slice(0, 100)}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const blob = await response.blob();
