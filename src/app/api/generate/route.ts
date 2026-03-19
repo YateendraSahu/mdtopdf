@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseMarkdown } from '@/lib/markdown';
+import fs from 'fs';
 
 // Optional: Rate limiting simple implementation
 // For production, use Upstash or similar
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Dynamically import Puppeteer and Chromium only when needed
     // This reduces the cold-start package size and avoids local conflicts
     const puppeteer = (await import('puppeteer-core')).default;
-    const chromium = await import('@sparticuz/chromium');
+    const chromium = (await import('@sparticuz/chromium')).default;
 
     const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
     if (isRateLimited(ip)) {
@@ -241,7 +242,7 @@ export async function POST(req: NextRequest) {
 
     const isLocal = process.env.NODE_ENV === 'development' || process.platform === 'win32';
 
-    let executablePath: string;
+    let executablePath: string | undefined;
     if (isLocal) {
       // Try multiple common local browser paths for Windows
       const paths = [
@@ -251,8 +252,18 @@ export async function POST(req: NextRequest) {
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       ];
       
-      executablePath = paths[0]; 
-      console.log('Local Mode: Using browser at:', executablePath);
+      for (const path of paths) {
+        if (fs.existsSync(path)) {
+          executablePath = path;
+          break;
+        }
+      }
+
+      if (!executablePath) {
+        console.warn('Local Mode: No common browser found, attempting to use system-installed Chrome/Edge if available');
+      } else {
+        console.log('Local Mode: Using browser at:', executablePath);
+      }
     } else {
       // Production Mode: Vercel/Linux
       executablePath = await chromium.executablePath();

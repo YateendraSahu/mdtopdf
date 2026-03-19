@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@sparticuz/chromium": "^143.0.4",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/core": "^3.20.4",
     "@tiptap/extension-code-block-lowlight": "^3.20.4",
@@ -43,6 +44,7 @@
     "next": "16.1.6",
     "next-themes": "^0.4.6",
     "prosemirror-markdown": "^1.13.4",
+    "puppeteer-core": "^24.39.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.5.0",
