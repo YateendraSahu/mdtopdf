@@ -127,11 +127,15 @@ export default function MarkdownEditor() {
     
     setIsGenerating(true);
     
-    // Give Mermaid and KaTeX a moment to finish any final rendering/animations
+    // Give Mermaid and KaTeX a moment to finish any final rendering
     await new Promise(resolve => setTimeout(resolve, 500));
     
     try {
       const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
+      
+      // Make it globally available for jsPDF to find
+      (window as any).html2canvas = html2canvas;
       
       const doc = new jsPDF({
         orientation: 'p',
@@ -140,7 +144,7 @@ export default function MarkdownEditor() {
         compress: true,
       });
 
-      // 2. High-quality vector-like rendering
+      // 2. High-quality vector rendering
       await doc.html(element, {
         callback: function (doc) {
           doc.save('document.pdf');
@@ -151,18 +155,17 @@ export default function MarkdownEditor() {
         x: 0,
         y: 0,
         width: 180, 
-        windowWidth: 1000, // Higher viewport width for better resolution
+        windowWidth: 1000, 
         html2canvas: {
-          scale: 0.25, // Adjusting scale for the best balance of quality/size
+          scale: 2, // High DPI for 'High Quality'
           useCORS: true,
           logging: false,
           letterRendering: true,
         }
       });
-    } catch (error) {
+    } catch (error: any) {
        console.error('Vector PDF Generation Error:', error);
-       alert('Failed to generate high-quality PDF. Falling back to print...');
-       window.print();
+       alert('Generation failed. Error details: ' + error.message);
        setIsGenerating(false);
     }
   };
