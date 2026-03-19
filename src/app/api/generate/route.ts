@@ -239,23 +239,29 @@ export async function POST(req: NextRequest) {
       </html>
     `;
 
-    const isLocal = process.env.NODE_ENV === 'development' || process.platform === 'win32';
+    // Detect environment accurately for Netlify/Production vs Local
+    const isNetlify = !!process.env.NETLIFY;
+    const isLocal = !isNetlify && (process.env.NODE_ENV === 'development' || process.platform === 'win32');
+    
+    // Set a very high timeout for the whole function 
+    // (Actual enforcement depends on Netlify account settings)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Function Timeout (25s reached)')), 25000)
+    );
 
     let executablePath: string;
     if (isLocal) {
-      // Try multiple common local browser paths for Windows
-      const paths = [
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      ];
-      
-      executablePath = paths[0]; 
-      console.log('Local Mode: Using browser at:', executablePath);
+        // ... local Windows paths ...
+        const paths = [
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        ];
+        executablePath = paths[0];
     } else {
-      // Production Mode: Vercel/Linux
-      executablePath = await chromium.executablePath();
+        // Optimized for Netlify / Serverless Linux
+        executablePath = await chromium.executablePath();
     }
 
     try {
@@ -333,17 +339,22 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('PDF Generation Error:', error);
+    // Return specific error message for debugging (can be removed later)
     return NextResponse.json(
       {
         error: 'Failed to generate PDF',
         message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.stack?.slice(0, 150) // Brief stack for insights
       },
       { status: 500 }
     );
   } finally {
      if (browser) {
-       await browser.close();
+       try {
+         await browser.close();
+       } catch (e) {
+         console.error('Error closing browser:', e);
+       }
      }
   }
 }
