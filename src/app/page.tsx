@@ -120,22 +120,51 @@ export default function MarkdownEditor() {
 
   if (!mounted) return null;
 
-  const handleGeneratePDF = () => {
-    // 1. Temporarily switch to Visual mode for the best print layout if in split view
-    const previousView = viewMode;
-    if (viewMode === 'split') {
-      setViewMode('visual');
-    }
-
-    // 2. Small delay to allow the layout to stabilize
-    setTimeout(() => {
-      window.print();
+  const handleGeneratePDF = async () => {
+    // 1. Target the visual/preview content for capture
+    const element = document.querySelector('.prose-slate') as HTMLElement;
+    if (!element) return;
+    
+    setIsGenerating(true);
+    
+    // Give Mermaid and KaTeX a moment to finish any final rendering/animations
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    try {
+      const { jsPDF } = await import('jspdf');
       
-      // 3. Optional: Restore split view after printing dialog closes
-      if (previousView === 'split') {
-        setTimeout(() => setViewMode('split'), 500);
-      }
-    }, 100);
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      // 2. High-quality vector-like rendering
+      await doc.html(element, {
+        callback: function (doc) {
+          doc.save('document.pdf');
+          setIsGenerating(false);
+        },
+        margin: [15, 15, 15, 15],
+        autoPaging: 'text',
+        x: 0,
+        y: 0,
+        width: 180, 
+        windowWidth: 1000, // Higher viewport width for better resolution
+        html2canvas: {
+          scale: 0.25, // Adjusting scale for the best balance of quality/size
+          useCORS: true,
+          logging: false,
+          letterRendering: true,
+        }
+      });
+    } catch (error) {
+       console.error('Vector PDF Generation Error:', error);
+       alert('Failed to generate high-quality PDF. Falling back to print...');
+       window.print();
+       setIsGenerating(false);
+    }
   };
 
   return (
