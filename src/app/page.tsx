@@ -120,45 +120,22 @@ export default function MarkdownEditor() {
 
   if (!mounted) return null;
 
-  const handleGeneratePDF = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-
-    try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ markdown }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to generate PDF';
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-        } else {
-          const text = await response.text();
-          errorMessage = `Server Error: ${response.status} ${response.statusText}. Response starts with: ${text.slice(0, 100)}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'document.pdf';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setIsGenerating(false);
+  const handleGeneratePDF = () => {
+    // 1. Temporarily switch to Visual mode for the best print layout if in split view
+    const previousView = viewMode;
+    if (viewMode === 'split') {
+      setViewMode('visual');
     }
+
+    // 2. Small delay to allow the layout to stabilize
+    setTimeout(() => {
+      window.print();
+      
+      // 3. Optional: Restore split view after printing dialog closes
+      if (previousView === 'split') {
+        setTimeout(() => setViewMode('split'), 500);
+      }
+    }, 100);
   };
 
   return (

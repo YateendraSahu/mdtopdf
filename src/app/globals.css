@@ -22,6 +22,81 @@ body {
   color: rgb(var(--foreground-rgb));
 }
 
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm 1cm;
+  }
+
+  /* Hide everything except the content we want in the PDF */
+  header, 
+  nav, 
+  footer, 
+  button, 
+  .no-print,
+  [role="toolbar"],
+  [class*="toolbar"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset layout for print */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Target only the preview area */
+  .editor-container {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure the preview area takes full width and height */
+  .preview-content {
+    width: 100% !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .prose {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 11pt !important;
+    color: #334155 !important;
+  }
+
+  /* Force background colors and images in print if desired */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent awkward page breaks */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+  
+  pre, blockquote, table, img {
+    page-break-inside: avoid;
+  }
+}
+
 /* Tighten Prose Spacing */
 .prose {
   line-height: 1.4 !important;
