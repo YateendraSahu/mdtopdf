@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     /* config options here */
-    serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
     transpilePackages: [
         'marked', 
         'marked-gfm-heading-id', 

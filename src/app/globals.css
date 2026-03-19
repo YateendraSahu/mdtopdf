@@ -25,7 +25,7 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 1.5cm 1cm;
+    margin: 0; /* Removing browser headers/footers like Date/URL */
   }
 
   /* Hide everything except the content we want in the PDF */
@@ -35,14 +35,15 @@ body {
   button, 
   .no-print,
   [role="toolbar"],
-  [class*="toolbar"] {
+  [class*="toolbar"],
+  .sticky {
     display: none !important;
   }
 
   body {
     background: white !important;
     color: black !important;
-    padding: 0 !important;
+    padding: 1.5cm 1.5cm !important; /* Move margins here instead of @page */
     margin: 0 !important;
   }
 
