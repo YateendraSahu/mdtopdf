@@ -130,6 +130,34 @@ export default function MarkdownEditor() {
     // Give Mermaid and KaTeX a moment to finish any final rendering
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    // Inject a special style to override ANY modern (lab/oklch) colors across the WHOLE APP temporarily
+    const styleId = 'pdf-safe-styles';
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        * {
+          color: inherit;
+          --tw-color-slate-50: #f8fafc !important;
+          --tw-color-slate-100: #f1f5f9 !important;
+          --tw-color-slate-200: #e2e8f0 !important;
+          --tw-color-slate-300: #cbd5e1 !important;
+          --tw-color-slate-400: #94a3b8 !important;
+          --tw-color-slate-500: #64748b !important;
+          --tw-color-slate-600: #475569 !important;
+          --tw-color-slate-700: #334155 !important;
+          --tw-color-slate-800: #1e293b !important;
+          --tw-color-slate-900: #0f172a !important;
+          --tw-color-blue-500: #3b82f6 !important;
+          --tw-color-blue-600: #2563eb !important;
+          --tw-prose-body: #334155 !important;
+          --tw-prose-headings: #1e293b !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
     try {
       const { jsPDF } = await import('jspdf');
       const html2canvas = (await import('html2canvas')).default;
@@ -149,6 +177,9 @@ export default function MarkdownEditor() {
         callback: function (doc) {
           doc.save('document.pdf');
           setIsGenerating(false);
+          // Cleanup our safety styles
+          const s = document.getElementById(styleId);
+          if (s) s.remove();
         },
         margin: [15, 15, 15, 15],
         autoPaging: 'text',
@@ -157,7 +188,7 @@ export default function MarkdownEditor() {
         width: 180, 
         windowWidth: 1000, 
         html2canvas: {
-          scale: 2, // High DPI for 'High Quality'
+          scale: 2, // High resolution
           useCORS: true,
           logging: false,
           letterRendering: true,
@@ -167,6 +198,8 @@ export default function MarkdownEditor() {
        console.error('Vector PDF Generation Error:', error);
        alert('Generation failed. Error details: ' + error.message);
        setIsGenerating(false);
+       const s = document.getElementById(styleId);
+       if (s) s.remove();
     }
   };
 
