@@ -121,85 +121,43 @@ export default function MarkdownEditor() {
   if (!mounted) return null;
 
   const handleGeneratePDF = async () => {
-    // 1. Target the visual/preview content for capture
-    const element = document.querySelector('.prose-slate') as HTMLElement;
-    if (!element) return;
-    
+    if (isGenerating) return;
     setIsGenerating(true);
-    
-    // Give Mermaid and KaTeX a moment to finish any final rendering
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Inject a special style to override ANY modern (lab/oklch) colors across the WHOLE APP temporarily
-    const styleId = 'pdf-safe-styles';
-    let style = document.getElementById(styleId);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = styleId;
-      style.innerHTML = `
-        * {
-          color: inherit;
-          --tw-color-slate-50: #f8fafc !important;
-          --tw-color-slate-100: #f1f5f9 !important;
-          --tw-color-slate-200: #e2e8f0 !important;
-          --tw-color-slate-300: #cbd5e1 !important;
-          --tw-color-slate-400: #94a3b8 !important;
-          --tw-color-slate-500: #64748b !important;
-          --tw-color-slate-600: #475569 !important;
-          --tw-color-slate-700: #334155 !important;
-          --tw-color-slate-800: #1e293b !important;
-          --tw-color-slate-900: #0f172a !important;
-          --tw-color-blue-500: #3b82f6 !important;
-          --tw-color-blue-600: #2563eb !important;
-          --tw-prose-body: #334155 !important;
-          --tw-prose-headings: #1e293b !important;
-        }
-      `;
-      document.head.appendChild(style);
-    }
 
     try {
-      const { jsPDF } = await import('jspdf');
-      const html2canvas = (await import('html2canvas')).default;
-      
-      // Make it globally available for jsPDF to find
-      (window as any).html2canvas = html2canvas;
-      
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markdown }),
       });
 
-      // 2. High-quality vector rendering
-      await doc.html(element, {
-        callback: function (doc) {
-          doc.save('document.pdf');
-          setIsGenerating(false);
-          // Cleanup our safety styles
-          const s = document.getElementById(styleId);
-          if (s) s.remove();
-        },
-        margin: [15, 15, 15, 15],
-        autoPaging: 'text',
-        x: 0,
-        y: 0,
-        width: 180, 
-        windowWidth: 1000, 
-        html2canvas: {
-          scale: 2, // High resolution
-          useCORS: true,
-          logging: false,
-          letterRendering: true,
+      if (!response.ok) {
+        let errorMessage = 'Failed to generate PDF';
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } else {
+          const text = await response.text();
+          errorMessage = `Server Error: ${response.status} ${response.statusText}. Response starts with: ${text.slice(0, 100)}`;
         }
-      });
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'document.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error: any) {
-       console.error('Vector PDF Generation Error:', error);
-       alert('Generation failed. Error details: ' + error.message);
-       setIsGenerating(false);
-       const s = document.getElementById(styleId);
-       if (s) s.remove();
+      alert(error.message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 

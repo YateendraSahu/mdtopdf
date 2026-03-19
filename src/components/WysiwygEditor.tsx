@@ -191,7 +191,7 @@ const CodeBlockComponent = ({ node, updateAttributes, extension }: any) => {
         try {
           mermaid.initialize({
             startOnLoad: false,
-            theme: 'default',
+            theme: 'base',
             securityLevel: 'loose',
             fontFamily: 'Inter, system-ui, sans-serif',
             flowchart: {
