@@ -80,6 +80,21 @@ body {
     margin: 0 !important;
     font-size: 11pt !important;
     color: #334155 !important;
+    --tw-prose-body: #334155;
+    --tw-prose-headings: #1e40af;
+    --tw-prose-links: #2563eb;
+    --tw-prose-bold: #1e293b;
+    --tw-prose-counters: #64748b;
+    --tw-prose-bullets: #cbd5e1;
+    --tw-prose-hr: #e2e8f0;
+    --tw-prose-quotes: #1e293b;
+    --tw-prose-quote-borders: #e2e8f0;
+    --tw-prose-captions: #64748b;
+    --tw-prose-code: #1e293b;
+    --tw-prose-pre-code: #f1f5f9;
+    --tw-prose-pre-bg: #0f172a;
+    --tw-prose-th-borders: #e2e8f0;
+    --tw-prose-td-borders: #f1f5f9;
   }
 
   /* Force background colors and images in print if desired */
